@@ -1,13 +1,12 @@
 package org.bstu.helpdesk;
 
-/**
- * Hello world!
- *
- */
-public class App 
-{
-    public static void main( String[] args )
-    {
-        System.out.println( "Hello World!" );
+import server.Server;
+
+public class App {
+    public static void main(String[] args) {
+        // Создаем экземпляр нашего сервера
+        Server server = new Server();
+        // Запускаем его
+        server.start();
     }
 }
