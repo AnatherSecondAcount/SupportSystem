@@ -10,6 +10,7 @@ import javafx.scene.control.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.bstu.helpdesk.network.ClientNetwork;
+import org.bstu.helpdesk.network.NetworkManager;
 
 import java.io.IOException;
 import java.util.List;
@@ -45,6 +46,7 @@ public class MainController {
                 if (item == null || empty) {
                     setText(null);
                 } else {
+                    // Это можно оставить, это просто форматирование
                     String[] parts = item.split(";");
                     if (parts.length >= 3) {
                         setText("ID: " + parts[0] + " | " + parts[1] + " [" + parts[2] + "]");
@@ -56,27 +58,17 @@ public class MainController {
         });
 
         ticketsListView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2) { // Проверяем, что это двойной клик
+            if (event.getClickCount() == 2) {
                 String selectedItem = ticketsListView.getSelectionModel().getSelectedItem();
                 if (selectedItem != null && !selectedItem.contains("...")) {
                     handleTicketSelection(selectedItem);
                 }
             }
         });
-
-        network = new ClientNetwork();
-        if (!network.connect()) {
-            showAlert("Ошибка подключения", "Не удалось подключиться к серверу.");
-            ticketsListView.setItems(FXCollections.observableArrayList("Сервер недоступен."));
-            refreshButton.setDisable(true);
-            createButton.setDisable(true); // Также блокируем новую кнопку
-        } else {
-            loadTickets();
-        }
     }
 
     public void initData(ClientNetwork network, String loginResponse) {
-        this.network = network;
+        this.network = NetworkManager.getNetwork();
 
         // Разбираем ответ сервера "SUCCESS_LOGIN;ID;ЛОГИН;РОЛЬ"
         String[] parts = loginResponse.split(";", 4);
@@ -89,15 +81,11 @@ public class MainController {
 
         // Загружаем заявки
         loadTickets();
-
-        // --- Логика доступа по ролям ---
-        // Если пользователь не администратор, запрещаем удаление
-        // (мы пока не делали кнопки в окне деталей, но это задел на будущее)
-        // if (!currentUserRole.equals("ADMIN")) {
-        //     // ... здесь можно будет скрывать/блокировать кнопки
-        // }
     }
 
+    public long getCurrentUserId() {
+        return currentUserId;
+    }
     @FXML
     void loadTickets() {
         try {
@@ -114,7 +102,6 @@ public class MainController {
         }
     }
 
-    // =================== НОВЫЙ МЕТОД ===================
     @FXML
     private void createTicket() throws IOException {
         String title = titleField.getText();
@@ -127,7 +114,7 @@ public class MainController {
         }
 
         // Формируем команду для сервера
-        String command = "CREATE_TICKET;" + title + ";" + description;
+        String command = "CREATE_TICKET;" + title + ";" + description + ";" + this.currentUserId;
 
         // Отправляем команду на сервер
         String response = network.sendCommandAndGetResponse(command);

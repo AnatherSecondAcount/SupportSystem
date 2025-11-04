@@ -5,6 +5,8 @@ import service.TicketService;
 import service.TicketServiceImpl;
 import service.UserService;
 import service.UserServiceImpl;
+import service.CommentService;
+import service.CommentServiceImpl;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -17,6 +19,7 @@ public class Server {
         // Создаем сервис, который будет обрабатывать бизнес-логику
         TicketService ticketService = new TicketServiceImpl();
         UserService userService = new UserServiceImpl();
+        CommentService commentService = new CommentServiceImpl();
 
 
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -30,7 +33,7 @@ public class Server {
 
                 // Для каждого клиента создаем новый поток-обработчик
                 // и передаем ему сокет и сервис
-                ClientHandler clientHandler = new ClientHandler(clientSocket, ticketService, userService);
+                ClientHandler clientHandler = new ClientHandler(clientSocket, ticketService, userService, commentService);
 
                 new Thread(clientHandler).start();
             }

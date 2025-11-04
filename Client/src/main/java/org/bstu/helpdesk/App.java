@@ -10,13 +10,11 @@ import javafx.stage.Stage;
 import org.bstu.helpdesk.controllers.LoginController;
 import org.bstu.helpdesk.controllers.MainController;
 import org.bstu.helpdesk.network.ClientNetwork;
+import org.bstu.helpdesk.network.NetworkManager;
 
 import java.io.IOException;
 
 public class App extends Application {
-
-    // Новое поле для хранения активного сетевого соединения
-    private ClientNetwork network;
 
     @Override
     public void start(Stage primaryStage) {
@@ -83,9 +81,7 @@ public class App extends Application {
     @Override
     public void stop() {
         System.out.println("Приложение закрывается. Отключаемся от сервера...");
-        if (network != null) {
-            network.disconnect();
-        }
+        NetworkManager.getNetwork().disconnect();
     }
     public static void main(String[] args) {
         launch(args);

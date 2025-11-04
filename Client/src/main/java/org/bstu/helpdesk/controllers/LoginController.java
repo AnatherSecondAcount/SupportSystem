@@ -7,6 +7,8 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import org.bstu.helpdesk.network.ClientNetwork;
+import org.bstu.helpdesk.network.NetworkManager;
+
 import java.io.IOException;
 
 public class LoginController {
@@ -20,10 +22,13 @@ public class LoginController {
     private String loginResponse = null; // Поле для хранения ответа сервера
 
     public void initialize() {
-        network = new ClientNetwork();
-        if (!network.connect()) {
-            errorLabel.setText("Нет связи с сервером.");
-            loginButton.setDisable(true);
+        // Получаем сеть из менеджера
+        this.network = NetworkManager.getNetwork();
+        if (!network.isConnected()) { // Проверяем, может уже подключились
+            if (!network.connect()) {
+                errorLabel.setText("Нет связи с сервером.");
+                loginButton.setDisable(true);
+            }
         }
     }
 

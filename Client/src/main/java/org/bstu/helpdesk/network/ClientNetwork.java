@@ -17,7 +17,7 @@ public class ClientNetwork {
     private Socket socket;
     private PrintWriter writer;
     private BufferedReader reader;
-    private boolean isConnected = false;
+    public boolean isConnected = false;
 
     public boolean connect() {
         try {
@@ -32,8 +32,11 @@ public class ClientNetwork {
         }
     }
 
-    // ==== ИСПРАВЛЕННЫЙ МЕТОД ====
-    // Этот метод теперь подходит для команд, которые возвращают ОДНУ строку ответа
+    public boolean isConnected() {
+        return isConnected;
+    }
+
+    // Этот метод подходит для команд, которые возвращают ОДНУ строку ответа
     public String sendCommandAndGetResponse(String command) throws IOException {
         if (!isConnected) {
             throw new IOException("Сервер не подключен");
@@ -69,5 +72,23 @@ public class ClientNetwork {
                 // Игнорируем ошибки при закрытии
             }
         }
+    }
+
+    public List<String> getCommentsForTicket(long ticketId) throws IOException {
+        if (!isConnected) {
+            throw new IOException("Сервер не подключен");
+        }
+
+        writer.println("GET_COMMENTS;" + ticketId);
+
+        List<String> commentLines = new ArrayList<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.equals("END_OF_LIST")) {
+                break;
+            }
+            commentLines.add(line);
+        }
+        return commentLines;
     }
 }

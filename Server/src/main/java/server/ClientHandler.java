@@ -6,6 +6,8 @@ import model.User;
 import service.TicketService;
 import service.UserService;
 import java.util.Optional;
+import model.Comment;
+import service.CommentService;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -18,25 +20,25 @@ import java.nio.charset.StandardCharsets;
 // Runnable позволяет запускать этот класс в отдельном потоке
 public class ClientHandler implements Runnable {
 
+    // === КОД ДЛЯ ОТЛАДКИ ===
+    private static int counter = 0; // Общий счетчик для всех ClientHandler'ов
+    private final int handlerId;      // Уникальный ID для этого конкретного объекта
+
     private final Socket clientSocket;
     private final TicketService ticketService;
     private UserService userService;
+    private final CommentService commentService;
+    private User currentUser = null;
 
-    public ClientHandler(Socket socket, TicketService ticketService, UserService userService) {
-        //System.out.println(">>> SERVER: Создание ClientHandler...");
+    public ClientHandler(Socket socket, TicketService ticketService, UserService userService, CommentService commentService) {
+        // === КОД ДЛЯ ОТЛАДКИ ===
+        this.handlerId = ++counter; // Увеличиваем счетчик и присваиваем ID
+        System.out.println(">>> SERVER: Создан ClientHandler с ID = " + this.handlerId);
 
         this.clientSocket = socket;
-        //System.out.println(">>> SERVER: clientSocket установлен: " + (this.clientSocket != null));
-
         this.ticketService = ticketService;
-        //System.out.println(">>> SERVER: ticketService установлен: " + (this.ticketService != null));
-
-        // Здесь самое интересное
         this.userService = userService;
-        //System.out.println(">>> SERVER: userService ПОЛУЧЕН как: " + (userService != null));
-        //System.out.println(">>> SERVER: this.userService СОХРАНЕН как: " + (this.userService != null));
-
-        //System.out.println(">>> SERVER: ClientHandler создан.");
+        this.commentService = commentService;
     }
 
     @Override
@@ -48,6 +50,10 @@ public class ClientHandler implements Runnable {
             String clientCommand;
             // Читаем команды от клиента, пока он не отключится
             while ((clientCommand = reader.readLine()) != null) {
+                // === КОД ДЛЯ ОТЛАДКИ ===
+                System.out.println(">>> [" + this.handlerId + "] Получена команда: " + clientCommand);
+                // ======================
+
                 System.out.println("Получена команда от клиента: " + clientCommand);
 
                 // --- ПРОСТОЙ ПРОТОКОЛ: "КОМАНДА;АРГУМЕНТ1;АРГУМЕНТ2" ---
@@ -57,35 +63,28 @@ public class ClientHandler implements Runnable {
 
                 switch (command) {
                     case "LOGIN":
-                        try { // <-- Добавляем try
-                            System.out.println(">>> SERVER: Начал обработку LOGIN...");
-                            String[] loginData = args.split(";", 2);
+                        String[] loginData = args.split(";", 2);
+                        if (loginData.length == 2) {
+                            String login = loginData[0];
+                            String password = loginData[1];
+                            Optional<User> userOpt = userService.authenticate(login, password);
 
-                            if (loginData.length == 2) {
-                                String login = loginData[0];
-                                String password = loginData[1];
-                                System.out.println(">>> SERVER: Пытаюсь аутентифицировать пользователя: " + login);
+                            if (userOpt.isPresent()) {
+                                this.currentUser = userOpt.get(); // 1. Присваиваем
+                                System.out.println(">>> [" + this.handlerId + "] User logged in: " + this.currentUser.getLogin());
 
-                                Optional<User> userOpt = userService.authenticate(login, password);
-
-                                if (userOpt.isPresent()) {
-                                    User user = userOpt.get();
-                                    String response = "SUCCESS_LOGIN;" + user.getId() + ";" + user.getLogin() + ";" + user.getRole().name();
-                                    System.out.println(">>> SERVER: Успешно. Отправляю ответ: " + response);
-                                    writer.println(response);
-                                } else {
-                                    System.out.println(">>> SERVER: Неуспешно. Неверный логин или пароль.");
-                                    writer.println("ERROR;Invalid login or password");
-                                }
+                                // 2. Используем
+                                String response = "SUCCESS_LOGIN;" + this.currentUser.getId() + ";" + this.currentUser.getLogin() + ";" + this.currentUser.getRole().name();
+                                writer.println(response);
                             } else {
-                                System.out.println(">>> SERVER: Ошибка формата команды.");
-                                writer.println("ERROR;Invalid arguments for LOGIN");
+                                System.err.println("!!! [" + this.handlerId + "] Authentication failed for user: " + login);
+                                writer.println("ERROR;Invalid login or password");
                             }
-                        } catch (Exception e) { // <-- Ловим любую ошибку
-                            System.err.println("!!! КРИТИЧЕСКАЯ ОШИБКА ВНУТРИ LOGIN HANDLER !!!");
-                            e.printStackTrace(); // <-- Распечатываем полный стектрейс ошибки
+                        } else {
+                            writer.println("ERROR;Invalid arguments for LOGIN");
                         }
                         break;
+
                     case "GET_ALL_TICKETS":
                         List<Ticket> tickets = ticketService.getAllTickets();
                         // Сериализуем (превращаем в строку) список заявок
@@ -95,6 +94,7 @@ public class ClientHandler implements Runnable {
                         // Отправляем специальную строку-маркер конца передачи
                         writer.println("END_OF_LIST");
                         break;
+
                     case "GET_TICKET_BY_ID":
                         try {
                             long id = Long.parseLong(args);
@@ -109,25 +109,68 @@ public class ClientHandler implements Runnable {
                             writer.println("ERROR;Неверный формат ID");
                         }
                         break;
+
                     case "CREATE_TICKET":
-                        // Аргументы 'args' содержат "Заголовок;Описание"
-                        String[] ticketData = args.split(";", 2);
-                        if (ticketData.length == 2) {
+                        String[] ticketData = args.split(";", 3); // Теперь 3 части
+                        if (ticketData.length == 3) {
                             String title = ticketData[0];
                             String description = ticketData[1];
-
-                            // Вызываем наш сервисный слой для создания заявки.
-                            // Поскольку у нас пока нет системы пользователей,
-                            // мы временно "хардкодим" ID создателя = 1L.
-                            Ticket createdTicket = ticketService.createTicket(title, description, 1L);
-
-                            // Отправляем клиенту подтверждение с ID новой заявки
+                            long creatorId = Long.parseLong(ticketData[2]); // <-- Получаем ID из команды
+                            Ticket createdTicket = ticketService.createTicket(title, description, creatorId);
                             writer.println("SUCCESS;Ticket created with ID: " + createdTicket.getId());
                         } else {
                             // Если клиент прислал команду в неверном формате
                             writer.println("ERROR;Invalid arguments for CREATE_TICKET");
                         }
                         break;
+
+                    case "GET_COMMENTS":
+                        try {
+                            long ticketId = Long.parseLong(args);
+                            List<Comment> comments = commentService.getCommentsForTicket(ticketId);
+                            for (Comment c : comments) {
+                                writer.println(c.getAuthorLogin() + ";" + c.getCreatedAt() + ";" + c.getTextContent());
+                            }
+                            writer.println("END_OF_LIST");
+                        } catch (NumberFormatException e) {
+                            writer.println("ERROR;Invalid ticket ID");
+                        }
+                        break;
+
+                    case "ADD_COMMENT":
+                        // === КОД ДЛЯ ОТЛАДКИ ===
+                        if(this.currentUser == null){
+                            System.err.println("!!! [" + this.handlerId + "] ОШИБКА: Попытка добавить комментарий, но currentUser is null!");
+                        } else {
+                            System.out.println(">>> [" + this.handlerId + "] Пользователь, добавляющий комментарий: " + this.currentUser.getLogin());
+                        }
+                        // ======================
+
+                        String[] commentData = args.split(";", 2);
+                        if (commentData.length == 2) {
+
+                            try {
+                                System.out.println(">>> SERVER: Начал обработку ADD_COMMENT...");
+                                long ticketId = Long.parseLong(commentData[0]);
+                                String text = commentData[1];
+
+                                System.out.println(">>> SERVER: Вызов commentService.addComment для ticketId=" + ticketId + ", authorId=" + currentUser.getId());
+
+                                commentService.addComment(ticketId, currentUser.getId(), text);
+
+                                System.out.println(">>> SERVER: Успешно добавил комментарий. Отправляю SUCCESS.");
+                                writer.println("SUCCESS;Comment added");
+
+                            } catch (Throwable t) { // <-- ИЗМЕНЕНО НА Throwable t
+                                System.err.println("!!! КРИТИЧЕСКАЯ ОШИБКА/ERROR ВНУТРИ ADD_COMMENT HANDLER !!!");
+                                t.printStackTrace(); // <-- Распечатаем Throwable
+                            }
+
+                        } else {
+                            writer.println("ERROR;Invalid arguments for ADD_COMMENT");
+                        }
+                        break;
+
                     case "UPDATE_STATUS":
                         // args содержит "ID;НОВЫЙ_СТАТУС"
                         String[] updateData = args.split(";", 2);

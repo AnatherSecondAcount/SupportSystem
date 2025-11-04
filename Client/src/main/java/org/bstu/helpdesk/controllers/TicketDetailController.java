@@ -1,14 +1,19 @@
 package org.bstu.helpdesk.controllers;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.control.*;
 import javafx.stage.Stage;
 import model.Ticket;
 import org.bstu.helpdesk.network.ClientNetwork;
+import org.bstu.helpdesk.network.NetworkManager;
+
 import java.io.IOException;
-import javafx.scene.control.ButtonType;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Optional;
 
 public class TicketDetailController {
@@ -20,23 +25,64 @@ public class TicketDetailController {
     @FXML private Button markInProgressButton;
     @FXML private Button markAsClosedButton;
     @FXML private Button deleteButton;
+    @FXML private ListView<String> commentsListView;
+    @FXML private TextField newCommentField;
+    @FXML private Button addCommentButton;
 
     // Поля для хранения нужных данных и объектов
     private long ticketId;
     private ClientNetwork network;
     private MainController mainController;
 
+    @FXML
+    public void initialize() {
+        // Настраиваем красивое отображение для ячеек списка комментариев
+        commentsListView.setCellFactory(param -> new ListCell<String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (item == null || empty) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    // ============= НОВАЯ ПРОВЕРКА =============
+                    if (!item.contains(";")) {
+                        // Если это служебное сообщение, просто выводим его.
+                        setText(item);
+                        setWrapText(false);
+                        return; // Выходим, чтобы не выполнять остальной код.
+                    }
+                    // ===========================================
+
+                    // Остальной код для разбора и форматирования выполняется,
+                    // только если мы уверены, что это строка с данными.
+                    String[] parts = item.split(";", 3);
+                    String author = parts[0];
+                    LocalDateTime dateTime = LocalDateTime.parse(parts[1]);
+                    String formattedDateTime = dateTime.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                    String text = parts[2];
+
+                    setText(author + " (" + formattedDateTime + "):\n" + text);
+                    setWrapText(true);
+                }
+            }
+        });
+    }
+
     // Новый метод для передачи всех нужных данных из MainController
     public void initData(long ticketId, String title, String status, String description,
                          ClientNetwork network, MainController mainController, String userRole) {
         this.ticketId = ticketId;
-        this.network = network;
+        this.network = NetworkManager.getNetwork();
         this.mainController = mainController;
 
         idLabel.setText(String.valueOf(ticketId));
         titleLabel.setText(title);
         statusLabel.setText(status);
         descriptionLabel.setText(description);
+
+        // Загружаем комментарии сразу при открытии окна
+        loadComments();
 
         if (!userRole.equals("ADMIN")) {
             deleteButton.setVisible(false); // Делаем кнопку невидимой
@@ -59,7 +105,42 @@ public class TicketDetailController {
             deleteButton.setManaged(false);
         }
     }
+    private void loadComments() {
+        try {
+            List<String> commentLines = network.getCommentsForTicket(ticketId); // Новый метод в ClientNetwork
+            if(commentLines.isEmpty()){
+                commentsListView.setItems(FXCollections.observableArrayList("Комментариев пока нет."));
+            } else {
+                ObservableList<String> observableComments = FXCollections.observableArrayList(commentLines);
+                commentsListView.setItems(observableComments);
+            }
+        } catch (IOException e) {
+            commentsListView.setItems(FXCollections.observableArrayList("Ошибка загрузки комментариев."));
+            e.printStackTrace();
+        }
+    }
 
+    @FXML
+    private void onAddComment() {
+        String commentText = newCommentField.getText();
+        if (commentText.isBlank()) {
+            return;
+        }
+
+        try {
+            String command = "ADD_COMMENT;" + ticketId + ";" + commentText;
+            String response = network.sendCommandAndGetResponse(command);
+
+            if (response != null && response.startsWith("SUCCESS")) {
+                newCommentField.clear();
+                loadComments(); // Перезагружаем список, чтобы увидеть новый комментарий
+            } else {
+                showAlert("Ошибка", "Не удалось добавить комментарий: " + response);
+            }
+        } catch (IOException e) {
+            showAlert("Ошибка сети", "Потеряно соединение с сервером.");
+        }
+    }
     @FXML
     private void onMarkInProgress() {
         updateStatus(Ticket.Status.IN_PROGRESS);
