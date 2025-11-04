@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.List;
 import java.util.Optional;
+import java.nio.charset.StandardCharsets;
 
 // Runnable позволяет запускать этот класс в отдельном потоке
 public class ClientHandler implements Runnable {
@@ -26,10 +27,8 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         try (
-                // Поток для чтения данных от клиента
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                // Поток для отправки данных клиенту
-                PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true)
+                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true, StandardCharsets.UTF_8)
         ) {
             String clientCommand;
             // Читаем команды от клиента, пока он не отключится
@@ -51,7 +50,6 @@ public class ClientHandler implements Runnable {
                         // Отправляем специальную строку-маркер конца передачи
                         writer.println("END_OF_LIST");
                         break;
-
                     case "GET_TICKET_BY_ID":
                         try {
                             long id = Long.parseLong(args);
@@ -64,6 +62,57 @@ public class ClientHandler implements Runnable {
                             }
                         } catch (NumberFormatException e) {
                             writer.println("ERROR;Неверный формат ID");
+                        }
+                        break;
+                    case "CREATE_TICKET":
+                        // Аргументы 'args' содержат "Заголовок;Описание"
+                        String[] ticketData = args.split(";", 2);
+                        if (ticketData.length == 2) {
+                            String title = ticketData[0];
+                            String description = ticketData[1];
+
+                            // Вызываем наш сервисный слой для создания заявки.
+                            // Поскольку у нас пока нет системы пользователей,
+                            // мы временно "хардкодим" ID создателя = 1L.
+                            Ticket createdTicket = ticketService.createTicket(title, description, 1L);
+
+                            // Отправляем клиенту подтверждение с ID новой заявки
+                            writer.println("SUCCESS;Ticket created with ID: " + createdTicket.getId());
+                        } else {
+                            // Если клиент прислал команду в неверном формате
+                            writer.println("ERROR;Invalid arguments for CREATE_TICKET");
+                        }
+                        break;
+                    case "UPDATE_STATUS":
+                        // args содержит "ID;НОВЫЙ_СТАТУС"
+                        String[] updateData = args.split(";", 2);
+                        if (updateData.length == 2) {
+                            try {
+                                long ticketId = Long.parseLong(updateData[0]);
+                                Ticket.Status newStatus = Ticket.Status.valueOf(updateData[1]); // Превращаем строку в enum
+
+                                // Вызываем сервисный слой
+                                ticketService.updateTicketStatus(ticketId, newStatus);
+                                writer.println("SUCCESS;Status updated successfully");
+
+                            } catch (NumberFormatException e) {
+                                writer.println("ERROR;Invalid ticket ID format");
+                            } catch (IllegalArgumentException e) {
+                                // Эта ошибка возникнет, если valueOf() не найдет такой статус
+                                writer.println("ERROR;Invalid status value");
+                            }
+                        } else {
+                            writer.println("ERROR;Invalid arguments for UPDATE_STATUS");
+                        }
+                        break;
+                    case "DELETE_TICKET":
+                        // args содержит ID
+                        try {
+                            long ticketId = Long.parseLong(args);
+                            ticketService.deleteTicket(ticketId); // Вызываем сервисный слой
+                            writer.println("SUCCESS;Ticket deleted successfully");
+                        } catch (NumberFormatException e) {
+                            writer.println("ERROR;Invalid ticket ID format");
                         }
                         break;
 

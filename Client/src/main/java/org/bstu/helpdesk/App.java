@@ -1,4 +1,3 @@
-// Находится в файле: client/src/main/java/org/bstu/helpdesk/App.java
 package org.bstu.helpdesk;
 
 import javafx.application.Application;
