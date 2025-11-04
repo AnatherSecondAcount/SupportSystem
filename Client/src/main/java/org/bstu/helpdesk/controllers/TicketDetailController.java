@@ -28,7 +28,7 @@ public class TicketDetailController {
 
     // Новый метод для передачи всех нужных данных из MainController
     public void initData(long ticketId, String title, String status, String description,
-                         ClientNetwork network, MainController mainController) {
+                         ClientNetwork network, MainController mainController, String userRole) {
         this.ticketId = ticketId;
         this.network = network;
         this.mainController = mainController;
@@ -38,6 +38,11 @@ public class TicketDetailController {
         statusLabel.setText(status);
         descriptionLabel.setText(description);
 
+        if (!userRole.equals("ADMIN")) {
+            deleteButton.setVisible(false); // Делаем кнопку невидимой
+            deleteButton.setManaged(false); // "Схлопываем" пространство, которое она занимала
+        }
+
         // Блокируем кнопки в зависимости от текущего статуса
         if (Ticket.Status.valueOf(status) == Ticket.Status.OPEN) {
             markAsClosedButton.setDisable(true);
@@ -46,6 +51,12 @@ public class TicketDetailController {
         } else if (Ticket.Status.valueOf(status) == Ticket.Status.CLOSED) {
             markInProgressButton.setDisable(true);
             markAsClosedButton.setDisable(true);
+        }
+
+        // --- Логика доступа по ролям ---
+        if (!userRole.equals("ADMIN")) {
+            deleteButton.setVisible(false);
+            deleteButton.setManaged(false);
         }
     }
 

@@ -4,6 +4,7 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.bstu.helpdesk.controllers.LoginController;
@@ -14,13 +15,21 @@ import java.io.IOException;
 
 public class App extends Application {
 
+    // Новое поле для хранения активного сетевого соединения
+    private ClientNetwork network;
+
     @Override
-    public void start(Stage primaryStage) { // Убираем throws IOException, так как обработаем внутри
+    public void start(Stage primaryStage) {
         try {
             // --- Шаг 1: Показываем окно логина ---
             FXMLLoader loginLoader = new FXMLLoader();
-            // Устанавливаем путь к FXML. Используем полный путь от корня classpath.
+            // Используем ЯВНОЕ указание класса App для поиска ресурса. Это надежнее.
             loginLoader.setLocation(App.class.getResource("/org/bstu/helpdesk/login-view.fxml"));
+
+            // Проверяем, что ресурс был найден
+            if (loginLoader.getLocation() == null) {
+                throw new IOException("Не удалось найти FXML для окна входа: /org/bstu/helpdesk/login-view.fxml");
+            }
 
             Parent loginRoot = loginLoader.load();
 
@@ -34,15 +43,22 @@ public class App extends Application {
             LoginController loginController = loginLoader.getController();
             String loginResponse = loginController.getLoginResponse();
 
+            ClientNetwork network = loginController.getNetwork(); // Сохраняем ссылку на сеть
+
             // --- Шаг 3: Если логин успешен, показываем главное окно ---
             if (loginResponse != null && loginResponse.startsWith("SUCCESS_LOGIN")) {
                 FXMLLoader mainLoader = new FXMLLoader();
                 mainLoader.setLocation(App.class.getResource("/org/bstu/helpdesk/main-view.fxml"));
 
+                if (mainLoader.getLocation() == null) {
+                    throw new IOException("Не удалось найти FXML для главного окна: /org/bstu/helpdesk/main-view.fxml");
+                }
+
                 Parent mainRoot = mainLoader.load();
 
                 MainController mainController = mainLoader.getController();
-                mainController.initData(loginController.getNetwork(), loginResponse);
+                // Передаем в MainController сетевое соединение и данные о пользователе
+                mainController.initData(network, loginResponse);
 
                 primaryStage.setTitle("Система учета заявок");
                 primaryStage.setScene(new Scene(mainRoot, 800, 600));
@@ -52,12 +68,25 @@ public class App extends Application {
             }
 
         } catch (IOException e) {
-            // !!! ЭТОТ БЛОК ПОКАЖЕТ НАМ НАСТОЯЩУЮ ОШИБКУ !!!
-            System.err.println("Критическая ошибка: не удалось загрузить FXML. Проверьте путь и синтаксис файла.");
-            e.printStackTrace(); // Печатаем полный стектрейс исключения
+            System.err.println("Критическая ошибка FXML:");
+            e.printStackTrace();
+            // Можно добавить Alert для пользователя
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Критическая ошибка");
+            alert.setHeaderText("Не удалось запустить приложение.");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
         }
     }
 
+    // Этот метод автоматически вызывается JavaFX при закрытии приложения
+    @Override
+    public void stop() {
+        System.out.println("Приложение закрывается. Отключаемся от сервера...");
+        if (network != null) {
+            network.disconnect();
+        }
+    }
     public static void main(String[] args) {
         launch(args);
     }

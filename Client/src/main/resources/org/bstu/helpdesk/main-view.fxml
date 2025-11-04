@@ -8,6 +8,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.Label?>
 
 <VBox alignment="CENTER" spacing="10.0"
       xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
@@ -38,4 +39,6 @@
 
     <Button fx:id="createButton" text="Создать заявку" onAction="#createTicket"/>
 
+    <!-- Метка для информации о пользователе -->
+    <Label fx:id="userInfoLabel" style="-fx-padding: 10 0 0 0;" />
 </VBox>

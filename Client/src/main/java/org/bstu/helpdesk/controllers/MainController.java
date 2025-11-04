@@ -26,9 +26,14 @@ public class MainController {
     private TextArea descriptionArea;
     @FXML
     private Button createButton;
+    @FXML
+    private Label userInfoLabel;
 
     private ClientNetwork network;
-    private String currentUserInfo;
+    //private String currentUserInfo;
+    private long currentUserId;
+    private String currentUserLogin;
+    private String currentUserRole;
 
     @FXML
     public void initialize() {
@@ -72,10 +77,25 @@ public class MainController {
 
     public void initData(ClientNetwork network, String loginResponse) {
         this.network = network;
-        this.currentUserInfo = loginResponse; // Сохраняем данные о пользователе
 
-        // Теперь, когда у нас есть сетевое соединение, загружаем заявки
+        // Разбираем ответ сервера "SUCCESS_LOGIN;ID;ЛОГИН;РОЛЬ"
+        String[] parts = loginResponse.split(";", 4);
+        this.currentUserId = Long.parseLong(parts[1]);
+        this.currentUserLogin = parts[2];
+        this.currentUserRole = parts[3];
+
+        // Устанавливаем текст в новую метку
+        userInfoLabel.setText("Вы вошли как: " + currentUserLogin + " [" + currentUserRole + "]");
+
+        // Загружаем заявки
         loadTickets();
+
+        // --- Логика доступа по ролям ---
+        // Если пользователь не администратор, запрещаем удаление
+        // (мы пока не делали кнопки в окне деталей, но это задел на будущее)
+        // if (!currentUserRole.equals("ADMIN")) {
+        //     // ... здесь можно будет скрывать/блокировать кнопки
+        // }
     }
 
     @FXML
@@ -170,7 +190,7 @@ public class MainController {
         // Получаем контроллер этого FXML
         TicketDetailController controller = loader.getController();
         // Вызываем его метод для установки данных
-        controller.initData(Long.parseLong(id), title, status, description, this.network, this);
+        controller.initData(Long.parseLong(id), title, status, description, this.network, this, this.currentUserRole);
 
         // Создаем новую сцену и окно (Stage)
         Stage stage = new Stage();
@@ -182,18 +202,5 @@ public class MainController {
 
         // Показываем окно и ждем, пока его не закроют
         stage.showAndWait();
-    }
-    // =======================================================
-
-    // (Я обновил метод initialize и добавил `createButton.setDisable(true);`
-    // чтобы блокировать кнопку создания при отсутствии связи с сервером)
-    // и заменил печать ошибок на вызов showAlert
-
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        if(network != null) {
-            network.disconnect();
-        }
     }
 }
