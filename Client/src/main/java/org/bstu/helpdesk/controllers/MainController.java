@@ -16,13 +16,10 @@ import java.util.List;
 
 public class MainController {
 
-    // --- Старые поля для списка ---
     @FXML
     private ListView<String> ticketsListView;
     @FXML
     private Button refreshButton;
-
-    // --- НОВЫЕ ПОЛЯ для создания заявки ---
     @FXML
     private TextField titleField;
     @FXML
@@ -31,6 +28,7 @@ public class MainController {
     private Button createButton;
 
     private ClientNetwork network;
+    private String currentUserInfo;
 
     @FXML
     public void initialize() {
@@ -70,6 +68,14 @@ public class MainController {
         } else {
             loadTickets();
         }
+    }
+
+    public void initData(ClientNetwork network, String loginResponse) {
+        this.network = network;
+        this.currentUserInfo = loginResponse; // Сохраняем данные о пользователе
+
+        // Теперь, когда у нас есть сетевое соединение, загружаем заявки
+        loadTickets();
     }
 
     @FXML

@@ -3,6 +3,8 @@ package server;
 
 import service.TicketService;
 import service.TicketServiceImpl;
+import service.UserService;
+import service.UserServiceImpl;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -14,6 +16,8 @@ public class Server {
     public void start() {
         // Создаем сервис, который будет обрабатывать бизнес-логику
         TicketService ticketService = new TicketServiceImpl();
+        UserService userService = new UserServiceImpl();
+
 
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Сервер запущен и слушает порт " + PORT);
@@ -26,7 +30,8 @@ public class Server {
 
                 // Для каждого клиента создаем новый поток-обработчик
                 // и передаем ему сокет и сервис
-                ClientHandler clientHandler = new ClientHandler(clientSocket, ticketService);
+                ClientHandler clientHandler = new ClientHandler(clientSocket, ticketService, userService);
+
                 new Thread(clientHandler).start();
             }
         } catch (IOException e) {

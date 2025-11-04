@@ -2,7 +2,10 @@
 package server;
 
 import model.Ticket;
+import model.User;
 import service.TicketService;
+import service.UserService;
+import java.util.Optional;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,7 +13,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.List;
-import java.util.Optional;
 import java.nio.charset.StandardCharsets;
 
 // Runnable позволяет запускать этот класс в отдельном потоке
@@ -18,10 +20,23 @@ public class ClientHandler implements Runnable {
 
     private final Socket clientSocket;
     private final TicketService ticketService;
+    private UserService userService;
 
-    public ClientHandler(Socket socket, TicketService ticketService) {
+    public ClientHandler(Socket socket, TicketService ticketService, UserService userService) {
+        //System.out.println(">>> SERVER: Создание ClientHandler...");
+
         this.clientSocket = socket;
+        //System.out.println(">>> SERVER: clientSocket установлен: " + (this.clientSocket != null));
+
         this.ticketService = ticketService;
+        //System.out.println(">>> SERVER: ticketService установлен: " + (this.ticketService != null));
+
+        // Здесь самое интересное
+        this.userService = userService;
+        //System.out.println(">>> SERVER: userService ПОЛУЧЕН как: " + (userService != null));
+        //System.out.println(">>> SERVER: this.userService СОХРАНЕН как: " + (this.userService != null));
+
+        //System.out.println(">>> SERVER: ClientHandler создан.");
     }
 
     @Override
@@ -41,6 +56,36 @@ public class ClientHandler implements Runnable {
                 String args = (parts.length > 1) ? parts[1] : "";
 
                 switch (command) {
+                    case "LOGIN":
+                        try { // <-- Добавляем try
+                            System.out.println(">>> SERVER: Начал обработку LOGIN...");
+                            String[] loginData = args.split(";", 2);
+
+                            if (loginData.length == 2) {
+                                String login = loginData[0];
+                                String password = loginData[1];
+                                System.out.println(">>> SERVER: Пытаюсь аутентифицировать пользователя: " + login);
+
+                                Optional<User> userOpt = userService.authenticate(login, password);
+
+                                if (userOpt.isPresent()) {
+                                    User user = userOpt.get();
+                                    String response = "SUCCESS_LOGIN;" + user.getId() + ";" + user.getLogin() + ";" + user.getRole().name();
+                                    System.out.println(">>> SERVER: Успешно. Отправляю ответ: " + response);
+                                    writer.println(response);
+                                } else {
+                                    System.out.println(">>> SERVER: Неуспешно. Неверный логин или пароль.");
+                                    writer.println("ERROR;Invalid login or password");
+                                }
+                            } else {
+                                System.out.println(">>> SERVER: Ошибка формата команды.");
+                                writer.println("ERROR;Invalid arguments for LOGIN");
+                            }
+                        } catch (Exception e) { // <-- Ловим любую ошибку
+                            System.err.println("!!! КРИТИЧЕСКАЯ ОШИБКА ВНУТРИ LOGIN HANDLER !!!");
+                            e.printStackTrace(); // <-- Распечатываем полный стектрейс ошибки
+                        }
+                        break;
                     case "GET_ALL_TICKETS":
                         List<Ticket> tickets = ticketService.getAllTickets();
                         // Сериализуем (превращаем в строку) список заявок
