@@ -1,12 +1,11 @@
-// Находится в файле: server/src/main/java/server/ClientHandler.java
 package server;
 
-import model.Ticket;
-import model.User;
+import dao.DictionaryDao;
+import model.*;
 import service.TicketService;
 import service.UserService;
 import java.util.Optional;
-import model.Comment;
+
 import service.CommentService;
 
 import java.io.BufferedReader;
@@ -20,25 +19,20 @@ import java.nio.charset.StandardCharsets;
 // Runnable позволяет запускать этот класс в отдельном потоке
 public class ClientHandler implements Runnable {
 
-    // === КОД ДЛЯ ОТЛАДКИ ===
-    private static int counter = 0; // Общий счетчик для всех ClientHandler'ов
-    private final int handlerId;      // Уникальный ID для этого конкретного объекта
-
     private final Socket clientSocket;
     private final TicketService ticketService;
     private UserService userService;
     private final CommentService commentService;
-    private User currentUser = null;
+    private BaseUser currentUser = null;
+    private DictionaryDao dictionaryDao;
 
-    public ClientHandler(Socket socket, TicketService ticketService, UserService userService, CommentService commentService) {
-        // === КОД ДЛЯ ОТЛАДКИ ===
-        this.handlerId = ++counter; // Увеличиваем счетчик и присваиваем ID
-        System.out.println(">>> SERVER: Создан ClientHandler с ID = " + this.handlerId);
-
+    public ClientHandler(Socket socket, TicketService ticketService, UserService userService,
+                         CommentService commentService, DictionaryDao dictionaryDao) { // <-- Все 5 зависимостей
         this.clientSocket = socket;
         this.ticketService = ticketService;
         this.userService = userService;
         this.commentService = commentService;
+        this.dictionaryDao = dictionaryDao; // <-- Присваивается
     }
 
     @Override
@@ -50,9 +44,6 @@ public class ClientHandler implements Runnable {
             String clientCommand;
             // Читаем команды от клиента, пока он не отключится
             while ((clientCommand = reader.readLine()) != null) {
-                // === КОД ДЛЯ ОТЛАДКИ ===
-                System.out.println(">>> [" + this.handlerId + "] Получена команда: " + clientCommand);
-                // ======================
 
                 System.out.println("Получена команда от клиента: " + clientCommand);
 
@@ -67,17 +58,17 @@ public class ClientHandler implements Runnable {
                         if (loginData.length == 2) {
                             String login = loginData[0];
                             String password = loginData[1];
-                            Optional<User> userOpt = userService.authenticate(login, password);
+                            Optional<BaseUser> userOpt = userService.authenticate(login, password);
 
                             if (userOpt.isPresent()) {
                                 this.currentUser = userOpt.get(); // 1. Присваиваем
-                                System.out.println(">>> [" + this.handlerId + "] User logged in: " + this.currentUser.getLogin());
+                                //System.out.println(">>> [" + this.handlerId + "] User logged in: " + this.currentUser.getLogin());
 
                                 // 2. Используем
                                 String response = "SUCCESS_LOGIN;" + this.currentUser.getId() + ";" + this.currentUser.getLogin() + ";" + this.currentUser.getRole().name();
                                 writer.println(response);
                             } else {
-                                System.err.println("!!! [" + this.handlerId + "] Authentication failed for user: " + login);
+                                //System.err.println("!!! [" + this.handlerId + "] Authentication failed for user: " + login);
                                 writer.println("ERROR;Invalid login or password");
                             }
                         } else {
@@ -111,17 +102,19 @@ public class ClientHandler implements Runnable {
                         break;
 
                     case "CREATE_TICKET":
-                        String[] ticketData = args.split(";", 3); // Теперь 3 части
-                        if (ticketData.length == 3) {
-                            String title = ticketData[0];
-                            String description = ticketData[1];
-                            long creatorId = Long.parseLong(ticketData[2]); // <-- Получаем ID из команды
-                            Ticket createdTicket = ticketService.createTicket(title, description, creatorId);
-                            writer.println("SUCCESS;Ticket created with ID: " + createdTicket.getId());
-                        } else {
-                            // Если клиент прислал команду в неверном формате
-                            writer.println("ERROR;Invalid arguments for CREATE_TICKET");
-                        }
+                        String[] ticketData = args.split(";", 5); // Теперь 5 частей
+                        if (ticketData.length == 5) {
+                            try {
+                                String title = ticketData[0];
+                                String description = ticketData[1];
+                                long creatorId = Long.parseLong(ticketData[2]);
+                                int categoryId = Integer.parseInt(ticketData[3]);
+                                int priorityId = Integer.parseInt(ticketData[4]);
+
+                                Ticket t = ticketService.createTicket(title, description, creatorId, categoryId, priorityId);
+                                writer.println("SUCCESS;Ticket created with ID: " + t.getId());
+                            } catch (NumberFormatException e) { writer.println("ERROR;Invalid numeric format"); }
+                        } else { writer.println("ERROR;Invalid arguments"); }
                         break;
 
                     case "GET_COMMENTS":
@@ -137,32 +130,36 @@ public class ClientHandler implements Runnable {
                         }
                         break;
 
-                    case "ADD_COMMENT":
-                        // === КОД ДЛЯ ОТЛАДКИ ===
-                        if(this.currentUser == null){
-                            System.err.println("!!! [" + this.handlerId + "] ОШИБКА: Попытка добавить комментарий, но currentUser is null!");
-                        } else {
-                            System.out.println(">>> [" + this.handlerId + "] Пользователь, добавляющий комментарий: " + this.currentUser.getLogin());
-                        }
-                        // ======================
+                    case "GET_CATEGORIES":
+                        List<Category> categories = dictionaryDao.findAllCategories();
+                        for (Category c : categories) { writer.println(c.getId() + ";" + c.getName()); }
+                        writer.println("END_OF_LIST");
+                        break;
 
+                    case "GET_PRIORITIES":
+                        List<Priority> priorities = dictionaryDao.findAllPriorities();
+                        for (Priority p : priorities) { writer.println(p.getId() + ";" + p.getName()); }
+                        writer.println("END_OF_LIST");
+                        break;
+
+                    case "ADD_COMMENT":
                         String[] commentData = args.split(";", 2);
                         if (commentData.length == 2) {
 
                             try {
-                                System.out.println(">>> SERVER: Начал обработку ADD_COMMENT...");
+                                //System.out.println(">>> SERVER: Начал обработку ADD_COMMENT...");
                                 long ticketId = Long.parseLong(commentData[0]);
                                 String text = commentData[1];
 
-                                System.out.println(">>> SERVER: Вызов commentService.addComment для ticketId=" + ticketId + ", authorId=" + currentUser.getId());
+                                //System.out.println(">>> SERVER: Вызов commentService.addComment для ticketId=" + ticketId + ", authorId=" + currentUser.getId());
 
                                 commentService.addComment(ticketId, currentUser.getId(), text);
 
-                                System.out.println(">>> SERVER: Успешно добавил комментарий. Отправляю SUCCESS.");
+                                //System.out.println(">>> SERVER: Успешно добавил комментарий. Отправляю SUCCESS.");
                                 writer.println("SUCCESS;Comment added");
 
                             } catch (Throwable t) { // <-- ИЗМЕНЕНО НА Throwable t
-                                System.err.println("!!! КРИТИЧЕСКАЯ ОШИБКА/ERROR ВНУТРИ ADD_COMMENT HANDLER !!!");
+                                //System.err.println("!!! КРИТИЧЕСКАЯ ОШИБКА/ERROR ВНУТРИ ADD_COMMENT HANDLER !!!");
                                 t.printStackTrace(); // <-- Распечатаем Throwable
                             }
 

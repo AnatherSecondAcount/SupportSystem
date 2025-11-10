@@ -28,6 +28,8 @@ public class TicketDetailController {
     @FXML private ListView<String> commentsListView;
     @FXML private TextField newCommentField;
     @FXML private Button addCommentButton;
+    @FXML private Label categoryLabel;
+    @FXML private Label priorityLabel;
 
     // Поля для хранения нужных данных и объектов
     private long ticketId;
@@ -78,6 +80,15 @@ public class TicketDetailController {
 
         idLabel.setText(String.valueOf(ticketId));
         titleLabel.setText(title);
+
+        // === ПЕРЕВОДИМ СТАТУС ===
+        String localizedStatus = switch (status) {
+            case "OPEN" -> "Открыта";
+            case "IN_PROGRESS" -> "В работе";
+            case "CLOSED" -> "Закрыта";
+            default -> status;
+        };
+
         statusLabel.setText(status);
         descriptionLabel.setText(description);
 

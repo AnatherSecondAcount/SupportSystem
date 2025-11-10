@@ -1,4 +1,5 @@
 package org.bstu.helpdesk.controllers;
+import org.bstu.helpdesk.models.DictionaryItem;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,18 +18,14 @@ import java.util.List;
 
 public class MainController {
 
-    @FXML
-    private ListView<String> ticketsListView;
-    @FXML
-    private Button refreshButton;
-    @FXML
-    private TextField titleField;
-    @FXML
-    private TextArea descriptionArea;
-    @FXML
-    private Button createButton;
-    @FXML
-    private Label userInfoLabel;
+    @FXML private ListView<String> ticketsListView;
+    @FXML private Button refreshButton;
+    @FXML private TextField titleField;
+    @FXML private TextArea descriptionArea;
+    @FXML private Button createButton;
+    @FXML private Label userInfoLabel;
+    @FXML private ComboBox<DictionaryItem> categoryComboBox;
+    @FXML private ComboBox<DictionaryItem> priorityComboBox;
 
     private ClientNetwork network;
     //private String currentUserInfo;
@@ -46,10 +43,19 @@ public class MainController {
                 if (item == null || empty) {
                     setText(null);
                 } else {
-                    // Это можно оставить, это просто форматирование
                     String[] parts = item.split(";");
                     if (parts.length >= 3) {
-                        setText("ID: " + parts[0] + " | " + parts[1] + " [" + parts[2] + "]");
+                        String id = parts[0];
+                        String title = parts[1];
+                        String status = parts[2];
+                        // === ПЕРЕВОДИМ СТАТУС ===
+                        String localizedStatus = switch (status) {
+                            case "OPEN" -> "Открыта";
+                            case "IN_PROGRESS" -> "В работе";
+                            case "CLOSED" -> "Закрыта";
+                            default -> status;
+                        };
+                        setText("ID: " + id + " | " + title + " [" + localizedStatus + "]");
                     } else {
                         setText(item);
                     }
@@ -81,6 +87,8 @@ public class MainController {
 
         // Загружаем заявки
         loadTickets();
+        // Загружаем справочники
+        loadDictionaries();
     }
 
     public long getCurrentUserId() {
@@ -102,35 +110,88 @@ public class MainController {
         }
     }
 
+    private void loadDictionaries() {
+        try {
+            // Загрузка и обработка категорий
+            List<String> categoriesData = network.getCategories();
+            ObservableList<DictionaryItem> categories = FXCollections.observableArrayList();
+            for (String line : categoriesData) {
+                String[] parts = line.split(";", 2);
+                int id = Integer.parseInt(parts[0]);
+                String name = parts[1];
+
+                // Объявляем переменную ЗДЕСЬ
+                String localizedName = switch (name) {
+                    case "HARDWARE" -> "Оборудование";
+                    case "SOFTWARE" -> "Программное обеспечение";
+                    case "NETWORK" -> "Сеть";
+                    default -> name;
+                };
+                categories.add(new DictionaryItem(id, localizedName));
+            }
+            categoryComboBox.setItems(categories);
+            if (!categories.isEmpty()) { categoryComboBox.getSelectionModel().selectFirst(); }
+
+            // Загрузка и обработка приоритетов
+            List<String> prioritiesData = network.getPriorities();
+            ObservableList<DictionaryItem> priorities = FXCollections.observableArrayList();
+            for (String line : prioritiesData) {
+                String[] parts = line.split(";", 2);
+                int id = Integer.parseInt(parts[0]);
+                String name = parts[1];
+
+                // И объявляем еще одну, независимую переменную, ЗДЕСЬ
+                String localizedName = switch (name) {
+                    case "LOW" -> "Низкий";
+                    case "MEDIUM" -> "Средний";
+                    case "HIGH" -> "Высокий";
+                    default -> name;
+                };
+                priorities.add(new DictionaryItem(id, localizedName));
+            }
+            priorityComboBox.setItems(priorities);
+            if (!priorities.isEmpty()) { priorityComboBox.getSelectionModel().selectFirst(); }
+
+        } catch (IOException e) {
+            showAlert("Ошибка загрузки", "Не удалось загрузить справочники категорий и приоритетов.");
+            e.printStackTrace();
+        }
+    }
+
     @FXML
     private void createTicket() throws IOException {
         String title = titleField.getText();
         String description = descriptionArea.getText();
 
-        // Простая проверка, что поля не пустые
         if (title.isBlank() || description.isBlank()) {
             showAlert("Ошибка ввода", "Заголовок и описание не могут быть пустыми.");
             return;
         }
 
-        // Формируем команду для сервера
-        String command = "CREATE_TICKET;" + title + ";" + description + ";" + this.currentUserId;
+        DictionaryItem selectedCategory = categoryComboBox.getSelectionModel().getSelectedItem();
+        DictionaryItem selectedPriority = priorityComboBox.getSelectionModel().getSelectedItem();
 
-        // Отправляем команду на сервер
+        if (selectedCategory == null || selectedPriority == null) {
+            showAlert("Ошибка ввода", "Пожалуйста, выберите категорию и приоритет.");
+            return;
+        }
+
+        int categoryId = selectedCategory.getId();
+        int priorityId = selectedPriority.getId();
+
+        String command = "CREATE_TICKET;" + title + ";" + description + ";" + currentUserId + ";" + categoryId + ";" + priorityId;
         String response = network.sendCommandAndGetResponse(command);
-        String[] responseParts = response.split(";", 2);
 
-        if (responseParts[0].equals("SUCCESS")) {
+        if (response != null && response.startsWith("SUCCESS")) {
             showAlert("Успех", "Заявка успешно создана!");
-            // Очищаем поля ввода
             titleField.clear();
             descriptionArea.clear();
-            // Обновляем список заявок, чтобы увидеть новую
             loadTickets();
         } else {
-            showAlert("Ошибка сервера", "Не удалось создать заявку: " + responseParts[1]);
+            showAlert("Ошибка сервера", "Не удалось создать заявку: " + response);
         }
     }
+
 
     // Вспомогательный метод для показа диалоговых окон
     private void showAlert(String title, String message) {
@@ -190,4 +251,6 @@ public class MainController {
         // Показываем окно и ждем, пока его не закроют
         stage.showAndWait();
     }
+
+
 }

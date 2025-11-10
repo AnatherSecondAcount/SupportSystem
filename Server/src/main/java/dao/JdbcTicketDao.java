@@ -23,14 +23,17 @@ public class JdbcTicketDao implements TicketDao {
 
     @Override
     public void create(Ticket ticket) {
-        String sql = "INSERT INTO tickets (title, description, status, created_by_user_id, created_at) " +
-                "VALUES (?, ?, ?, ?, ?) RETURNING id";
+        String sql = "INSERT INTO tickets (title, description, status, created_by_user_id, created_at, category_id, priority_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, ticket.getTitle());
             statement.setString(2, ticket.getDescription());
             statement.setString(3, ticket.getStatus().name());
             statement.setLong(4, ticket.getCreatedByUserId());
             statement.setTimestamp(5, Timestamp.valueOf(ticket.getCreatedAt()));
+            statement.setObject(6, ticket.getCategoryId());
+            statement.setObject(7, ticket.getPriorityId());
+
 
             ResultSet rs = statement.executeQuery();
             if (rs.next()) {
@@ -74,12 +77,15 @@ public class JdbcTicketDao implements TicketDao {
 
     @Override
     public void update(Ticket ticket) {
-        String sql = "UPDATE tickets SET title = ?, description = ?, status = ? WHERE id = ?";
+        String sql = "UPDATE tickets SET title = ?, description = ?, status = ?, category_id = ?, priority_id = ? WHERE id = ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, ticket.getTitle());
             statement.setString(2, ticket.getDescription());
             statement.setString(3, ticket.getStatus().name());
-            statement.setLong(4, ticket.getId());
+            statement.setObject(4, ticket.getCategoryId());
+            statement.setObject(5, ticket.getPriorityId());
+
+            statement.setLong(6, ticket.getId());
             statement.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -105,6 +111,8 @@ public class JdbcTicketDao implements TicketDao {
         ticket.setStatus(Ticket.Status.valueOf(rs.getString("status")));
         ticket.setCreatedByUserId(rs.getLong("created_by_user_id"));
         ticket.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        ticket.setCategoryId((Integer) rs.getObject("category_id"));
+        ticket.setPriorityId((Integer) rs.getObject("priority_id"));
         return ticket;
     }
 }

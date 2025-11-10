@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TicketService {
-    Ticket createTicket(String title, String description, long creatorId);
+    Ticket createTicket(String title, String description, long creatorId, int categoryId, int priorityId);
     Optional<Ticket> getTicketById(long id);
     List<Ticket> getAllTickets();
     Ticket updateTicketStatus(long ticketId, Ticket.Status newStatus);

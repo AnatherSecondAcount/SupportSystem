@@ -10,6 +10,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.control.Label?>
 
+<?import javafx.scene.control.ComboBox?>
 <VBox alignment="CENTER" spacing="10.0"
       xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.bstu.helpdesk.controllers.MainController">
@@ -35,6 +36,14 @@
         <Label text="Описание:" minWidth="80"/>
         <!-- TextArea используется для многострочного текста -->
         <TextArea fx:id="descriptionArea" HBox.hgrow="ALWAYS" prefHeight="100"/>
+    </HBox>
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Категория:" minWidth="80"/>
+        <ComboBox fx:id="categoryComboBox" HBox.hgrow="ALWAYS"/>
+    </HBox>
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Приоритет:" minWidth="80"/>
+        <ComboBox fx:id="priorityComboBox" HBox.hgrow="ALWAYS"/>
     </HBox>
 
     <Button fx:id="createButton" text="Создать заявку" onAction="#createTicket"/>

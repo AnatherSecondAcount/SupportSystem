@@ -91,4 +91,40 @@ public class ClientNetwork {
         }
         return commentLines;
     }
+
+    public List<String> getCategories() throws IOException {
+        if (!isConnected) {
+            throw new IOException("Сервер не подключен");
+        }
+
+        writer.println("GET_CATEGORIES");
+
+        List<String> lines = new ArrayList<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.equals("END_OF_LIST")) {
+                break;
+            }
+            lines.add(line);
+        }
+        return lines;
+    }
+
+    public List<String> getPriorities() throws IOException {
+        if (!isConnected) {
+            throw new IOException("Сервер не подключен");
+        }
+
+        writer.println("GET_PRIORITIES");
+
+        List<String> lines = new ArrayList<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.equals("END_OF_LIST")) {
+                break;
+            }
+            lines.add(line);
+        }
+        return lines;
+    }
 }

@@ -10,6 +10,25 @@ public class Ticket {
     private Status status;
     private long createdByUserId;
     private LocalDateTime createdAt;
+    private Integer categoryId; // Используем Integer, так как они могут быть NULL
+
+    public Integer getPriorityId() {
+        return priorityId;
+    }
+
+    public void setPriorityId(Integer priorityId) {
+        this.priorityId = priorityId;
+    }
+
+    public Integer getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(Integer categoryId) {
+        this.categoryId = categoryId;
+    }
+
+    private Integer priorityId;
 
     public enum Status {
         OPEN,

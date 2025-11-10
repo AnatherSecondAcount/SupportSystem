@@ -1,7 +1,7 @@
 package dao;
-import model.User;
+import model.BaseUser;
 import java.util.Optional;
 
 public interface UserDao {
-    Optional<User> findByLogin(String login);
+    Optional<BaseUser> findByLogin(String login);
 }

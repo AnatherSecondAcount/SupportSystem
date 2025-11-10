@@ -1,7 +1,8 @@
 package service;
+import model.BaseUser;
 import model.User;
 import java.util.Optional;
 
 public interface UserService {
-    Optional<User> authenticate(String login, String password);
+    Optional<BaseUser> authenticate(String login, String password);
 }

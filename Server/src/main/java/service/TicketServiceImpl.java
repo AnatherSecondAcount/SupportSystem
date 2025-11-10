@@ -20,7 +20,7 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
-    public Ticket createTicket(String title, String description, long creatorId) {
+    public Ticket createTicket(String title, String description, long creatorId, int categoryId, int priorityId)  {
         Ticket newTicket = new Ticket();
         newTicket.setTitle(title);
         newTicket.setDescription(description);
@@ -31,6 +31,14 @@ public class TicketServiceImpl implements TicketService {
         newTicket.setStatus(Ticket.Status.OPEN);
         // 2. Устанавливаем текущее время создания
         newTicket.setCreatedAt(LocalDateTime.now());
+
+        // --- Устанавливаем ID из параметров ---
+        newTicket.setCategoryId(categoryId);
+        newTicket.setPriorityId(priorityId);
+
+        // === ВРЕМЕННО УСТАНАВЛИВАЕМ ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ ===
+        newTicket.setCategoryId(2); // ID для 'SOFTWARE'
+        newTicket.setPriorityId(1); // ID для 'LOW'
 
         ticketDao.create(newTicket);
         return newTicket;

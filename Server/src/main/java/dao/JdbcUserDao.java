@@ -1,5 +1,8 @@
 package dao;
 
+import model.Admin;
+import model.BaseUser;
+import model.Employee;
 import model.User;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -11,17 +14,26 @@ public class JdbcUserDao implements UserDao {
     private final Connection connection = DatabaseConnector.getConnection();
 
     @Override
-    public Optional<User> findByLogin(String login) {
+    public Optional<BaseUser> findByLogin(String login) {
         String sql = "SELECT * FROM users WHERE login = ?";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, login);
             ResultSet rs = statement.executeQuery();
             if (rs.next()) {
-                User user = new User();
+                // Создаем фабрику объектов в зависимости от роли
+                User.Role role = User.Role.valueOf(rs.getString("role"));
+                BaseUser user;
+
+                if (role == User.Role.ADMIN) {
+                    user = new Admin();
+                } else {
+                    user = new Employee();
+                }
+
                 user.setId(rs.getLong("id"));
                 user.setLogin(rs.getString("login"));
                 user.setPassword(rs.getString("password"));
-                user.setRole(User.Role.valueOf(rs.getString("role")));
+
                 return Optional.of(user);
             }
         } catch (SQLException e) {
