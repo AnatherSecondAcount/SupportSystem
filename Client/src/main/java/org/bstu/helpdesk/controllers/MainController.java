@@ -1,4 +1,5 @@
 package org.bstu.helpdesk.controllers;
+import org.bstu.helpdesk.App;
 import org.bstu.helpdesk.models.DictionaryItem;
 
 import javafx.collections.FXCollections;
@@ -26,12 +27,14 @@ public class MainController {
     @FXML private Label userInfoLabel;
     @FXML private ComboBox<DictionaryItem> categoryComboBox;
     @FXML private ComboBox<DictionaryItem> priorityComboBox;
+    @FXML private Button logoutButton;
 
     private ClientNetwork network;
     //private String currentUserInfo;
     private long currentUserId;
     private String currentUserLogin;
     private String currentUserRole;
+    private App app;
 
     @FXML
     public void initialize() {
@@ -73,7 +76,8 @@ public class MainController {
         });
     }
 
-    public void initData(ClientNetwork network, String loginResponse) {
+    public void initData(App app, ClientNetwork network, String loginResponse) {
+        this.app = app;
         this.network = NetworkManager.getNetwork();
 
         // Разбираем ответ сервера "SUCCESS_LOGIN;ID;ЛОГИН;РОЛЬ"
@@ -94,6 +98,7 @@ public class MainController {
     public long getCurrentUserId() {
         return currentUserId;
     }
+
     @FXML
     void loadTickets() {
         try {
@@ -250,6 +255,19 @@ public class MainController {
 
         // Показываем окно и ждем, пока его не закроют
         stage.showAndWait();
+    }
+
+    @FXML
+    private void handleLogout() {
+        // Закрываем текущее окно
+        Stage stage = (Stage) logoutButton.getScene().getWindow();
+        stage.close();
+
+        // Отключаемся от сервера
+        network.disconnect();
+
+        // Вызываем метод в App, который перезапустит логин
+        app.showLoginScreen();
     }
 
 

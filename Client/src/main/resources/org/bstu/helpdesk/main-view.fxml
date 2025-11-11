@@ -11,6 +11,7 @@
 <?import javafx.scene.control.Label?>
 
 <?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.layout.Region?>
 <VBox alignment="CENTER" spacing="10.0"
       xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="org.bstu.helpdesk.controllers.MainController">
@@ -48,6 +49,12 @@
 
     <Button fx:id="createButton" text="Создать заявку" onAction="#createTicket"/>
 
-    <!-- Метка для информации о пользователе -->
-    <Label fx:id="userInfoLabel" style="-fx-padding: 10 0 0 0;" />
+    <!-- Оборачиваем информацию и кнопку "Выход" в HBox для выравнивания -->
+    <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 10 0 0 0;">
+        <!-- Убираем отсюда fx:id, т.к. можно получить доступ по-другому -->
+        <Label fx:id="userInfoLabel" />
+        <!-- Пустой "распорный" элемент, который займет все свободное место -->
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="logoutButton" text="Выход" onAction="#handleLogout"/>
+    </HBox>
 </VBox>
